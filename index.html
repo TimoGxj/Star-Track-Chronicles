@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>星轨纪事 - Star Track Chronicles</title>
+    <meta name="description" content="通过三维时间轴+成就星图，将重要时刻转化为可交互的星际仪式">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- 加载界面 - 火箭发射动画 -->
+    <div id="loading-screen" class="loading-screen active">
+        <div class="rocket-container">
+            <div class="rocket">
+                <div class="rocket-body"></div>
+                <div class="rocket-window"></div>
+                <div class="rocket-flame"></div>
+            </div>
+            <div class="countdown-text">准备发射...</div>
+        </div>
+        <div class="stars-background"></div>
+    </div>
+
+    <!-- 主容器 -->
+    <div id="app-container" class="app-container hidden">
+        <!-- Three.js 画布容器 -->
+        <div id="canvas-container" class="canvas-container"></div>
+
+        <!-- 星空背景粒子 -->
+        <div class="stars-layer" id="stars-layer"></div>
+
+        <!-- 顶部导航栏 -->
+        <header class="main-header">
+            <div class="logo">
+                <span class="logo-icon">⭐</span>
+                <span class="logo-text">星轨纪事</span>
+            </div>
+            <nav class="main-nav">
+                <button class="nav-btn active" data-mode="all">
+                    <span class="icon">⭐</span>
+                    <span class="text">全部</span>
+                </button>
+                <button class="nav-btn" data-mode="capsule">
+                    <span class="icon">🕰️</span>
+                    <span class="text">时间胶囊</span>
+                </button>
+                <button class="nav-btn" data-mode="track">
+                    <span class="icon">🎯</span>
+                    <span class="text">目标星轨</span>
+                </button>
+                <button class="nav-btn" data-mode="milestone">
+                    <span class="icon">🏆</span>
+                    <span class="text">里程碑</span>
+                </button>
+                <button class="nav-btn" data-mode="letter">
+                    <span class="icon">✉️</span>
+                    <span class="text">时光信笺</span>
+                </button>
+            </nav>
+            <div class="header-actions">
+                <button class="icon-btn" id="settings-btn" title="设置">⚙️</button>
+                <button class="icon-btn" id="achievements-btn" title="成就">🏅</button>
+            </div>
+        </header>
+
+        <!-- 侧边控制面板 -->
+        <aside class="control-panel" id="control-panel">
+            <div class="panel-header">
+                <h2 class="panel-title">创建新事件</h2>
+                <button class="close-btn" id="close-panel">✕</button>
+            </div>
+            <div class="panel-content" id="panel-content">
+                <!-- 动态内容区域 -->
+            </div>
+        </aside>
+
+        <!-- 浮动操作按钮 -->
+        <button class="fab" id="create-btn" title="创建新事件">
+            <span class="fab-icon">+</span>
+        </button>
+
+        <!-- 事件列表侧边栏 -->
+        <div class="events-sidebar" id="events-sidebar">
+            <div class="sidebar-header">
+                <h3>我的事件</h3>
+                <button class="collapse-btn" id="collapse-sidebar">◀</button>
+            </div>
+            <div class="events-list" id="events-list">
+                <!-- 动态生成的事件卡片 -->
+            </div>
+        </div>
+
+        <!-- 成就系统弹窗 -->
+        <div class="modal" id="achievements-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>🏅 成就系统</h2>
+                    <button class="close-btn" onclick="closeModal('achievements-modal')">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="achievements-grid" id="achievements-grid">
+                        <!-- 成就卡片将动态生成 -->
+                    </div>
+                    <div class="constellation-preview" id="constellation-preview">
+                        <h3>你的守护星座</h3>
+                        <canvas id="constellation-canvas" width="400" height="400"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 设置弹窗 -->
+        <div class="modal" id="settings-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2>⚙️ 设置</h2>
+                    <button class="close-btn" onclick="closeModal('settings-modal')">✕</button>
+                </div>
+                <div class="modal-body">
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="voice-enabled"> 启用语音播报
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="notifications-enabled"> 启用桌面通知
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="particles-enabled" checked> 启用粒子特效
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>音乐音量</label>
+                        <input type="range" id="music-volume" min="0" max="100" value="50">
+                    </div>
+                    <div class="setting-item">
+                        <label>时区选择</label>
+                        <select id="timezone-select">
+                            <option value="Asia/Shanghai">北京时间 (GMT+8)</option>
+                            <option value="UTC">世界标准时间 (UTC)</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <button class="btn btn-primary" onclick="exportData()">导出数据</button>
+                        <button class="btn btn-secondary" onclick="importData()">导入数据</button>
+                    </div>
+                    <div class="setting-item">
+                        <button class="btn btn-primary" onclick="safeLoadDemoData()" style="width: 100%;">🎮 加载演示数据</button>
+                        <p style="font-size: 12px; color: #d4d4d8; margin-top: 10px;">首次使用？加载演示数据快速体验所有功能！</p>
+                    </div>
+                    <div class="setting-item">
+                        <button class="btn btn-secondary" onclick="testDataLoad()" style="width: 100%;">🔍 测试数据加载</button>
+                        <p style="font-size: 12px; color: #d4d4d8; margin-top: 10px;">检查数据是否正确加载（查看控制台F12）</p>
+                    </div>
+                    <div class="setting-item">
+                        <button class="btn btn-secondary" onclick="clearAllData()" style="width: 100%; background: rgba(239, 68, 68, 0.2); border-color: #ef4444;">🗑️ 清空所有数据</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 粒子特效容器 -->
+        <canvas id="particles-canvas" class="particles-canvas"></canvas>
+
+        <!-- 通知提示 -->
+        <div class="toast-container" id="toast-container"></div>
+        
+        <!-- 快捷键提示 -->
+        <div class="shortcuts-hint" id="shortcuts-hint">
+            <button class="shortcuts-toggle" onclick="toggleShortcuts()">⌨️</button>
+            <div class="shortcuts-panel hidden">
+                <h4>快捷键</h4>
+                <div class="shortcut-item"><kbd>N</kbd> 新建事件</div>
+                <div class="shortcut-item"><kbd>A</kbd> 成就系统</div>
+                <div class="shortcut-item"><kbd>S</kbd> 设置</div>
+                <div class="shortcut-item"><kbd>L</kbd> 侧边栏</div>
+                <div class="shortcut-item"><kbd>1-4</kbd> 切换模式</div>
+                <div class="shortcut-item"><kbd>ESC</kbd> 关闭面板</div>
+            </div>
+        </div>
+        
+        <!-- 首次使用引导 -->
+        <div class="welcome-guide" id="welcome-guide">
+            <div class="welcome-content">
+                <h2>🌟 欢迎使用星轨纪事！</h2>
+                <p>这是一个基于3D技术的时间管理应用</p>
+                <div class="guide-features">
+                    <div class="feature-item">
+                        <span class="feature-icon">🕰️</span>
+                        <span class="feature-text">时间胶囊倒计时</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">🎯</span>
+                        <span class="feature-text">目标进度追踪</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">🏆</span>
+                        <span class="feature-text">里程碑记录</span>
+                    </div>
+                    <div class="feature-item">
+                        <span class="feature-icon">✉️</span>
+                        <span class="feature-text">时光信笺</span>
+                    </div>
+                </div>
+                <div class="guide-actions">
+                    <button class="btn btn-primary" onclick="safeLoadDemoData()">🎮 加载演示数据</button>
+                    <button class="btn btn-secondary" onclick="closeWelcomeGuide()">🚀 直接开始</button>
+                </div>
+                <p style="font-size: 12px; color: #d4d4d8; margin-top: 20px;">
+                    提示：首次使用建议加载演示数据，快速体验所有功能
+                </p>
+                <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.1);">
+                    <p style="font-size: 14px; color: #00d4ff;">📊 演示数据包含：</p>
+                    <ul style="text-align: left; margin-top: 10px; font-size: 13px; color: #d4d4d8; line-height: 1.8;">
+                        <li>🕰️ 3个时间胶囊（闹钟模型）</li>
+                        <li>🎯 3个目标星轨（轨道模型，带进度）</li>
+                        <li>🏆 4个里程碑（奖杯模型）</li>
+                        <li>✉️ 2个时光信笺（信封模型）</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 依赖库 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <!-- 演示数据（可选） -->
+    <script src="demo-data.js"></script>
+    
+    <!-- 主程序 -->
+    <script src="main.js"></script>
+</body>
+</html>
+
